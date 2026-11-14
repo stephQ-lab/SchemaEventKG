@@ -1,0 +1,18 @@
+{
+  "provenance": "hand_slice",
+  "cross_document_positives": 5,
+  "note": "手工编写的封闭对照集，句子按周报口径写成，不是从十篇原文逐句抽出来的标注。跨文档正例在这个文件里是 5 条。消融报告里的第 6 条 ship→freight 由 evaluate_cross.ablation_gold() 在运行时追加，属于构造样本，不在本文件中。FakeChat/脚本提案只用于功能测试，这里的分数不是模型准确率。",
+  "pairs": [
+    {"head": "r1:hot", "tail": "r2:price", "label": 1, "category": "explicit_cause", "expected_class": "ASSERTED_CAUSE", "direction": "head_causes_tail", "reviewed": true, "scope": "cross", "note": "4月24日原文写明铁水产量上升带动矿价上涨"},
+    {"head": "r1:ship", "tail": "r2:arrive", "label": 1, "category": "cross_document_implicit", "expected_class": "ASSERTED_CAUSE", "direction": "head_causes_tail", "reviewed": true, "scope": "cross", "note": "4月24日原文写明发运下降导致到港下降，两件事发生在相邻两期"},
+    {"head": "r2:arrive", "tail": "r3:stock", "label": 1, "category": "indirect", "expected_class": "ASSERTED_CAUSE", "direction": "head_causes_tail", "reviewed": true, "scope": "cross", "note": "5月15日原文写明到港下降带动港口库存下降"},
+    {"head": "r1:price", "tail": "r4:cost", "label": 1, "category": "multi_cause", "expected_class": "ASSERTED_CAUSE", "direction": "head_causes_tail", "reviewed": true, "scope": "cross", "note": "同一句同时点名矿价与焦炭推高成本"},
+    {"head": "r1:coke", "tail": "r4:cost", "label": 1, "category": "multi_cause", "expected_class": "ASSERTED_CAUSE", "direction": "head_causes_tail", "reviewed": true, "scope": "cross", "note": "同一句同时点名焦炭价格上涨推高成本"},
+    {"head": "r2:drain", "tail": "r2:build", "label": 1, "category": "cross_paragraph_implicit", "expected_class": "ASSERTED_CAUSE", "direction": "head_causes_tail", "reviewed": true, "scope": "local", "note": "同篇局部关系，跨文档阶段不得再确认一条"},
+    {"head": "r1:price", "tail": "r2:price", "label": 0, "category": "temporal_order_no_cause", "expected_class": "NEXT_OBSERVATION", "direction": "none", "reviewed": true, "scope": "cross", "note": "同一价格指标的前后两期"},
+    {"head": "r1:price", "tail": "r3:mood", "label": 0, "category": "same_topic_no_cause", "expected_class": "NONE", "direction": "none", "reviewed": true, "scope": "cross", "note": "同属黑色系讨论，原文没有把情绪归因于矿价"},
+    {"head": "r1:price", "tail": "r4:margin", "label": 0, "category": "temporal_order_no_cause", "expected_class": "NONE", "direction": "none", "reviewed": true, "scope": "cross", "note": "5月22日虽写挤压利润，但4月24日盈利率已经回升，中间反向观测否定这条直连"},
+    {"head": "r1:inv", "tail": "r2:price", "label": 0, "category": "historical_rule_not_applicable", "expected_class": "NONE", "direction": "none", "reviewed": true, "scope": "cross", "note": "历史句式是库存上升导致价格下降，本期价格却在上涨，规律不能直接套用"},
+    {"head": "r1:hot", "tail": "r3:mood", "label": 0, "category": "insufficient_evidence", "expected_class": "NONE", "direction": "none", "reviewed": true, "scope": "cross", "note": "没有关系支持证据"}
+  ]
+}

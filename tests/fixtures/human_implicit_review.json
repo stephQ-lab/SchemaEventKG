@@ -1,0 +1,84 @@
+{
+  "note": "四句都摘自十篇研报原文。label 只表示能不能当成跨文档隐式因果，0 表示不能。这不是构造切片，也不拿来算方法 F1。",
+  "items": [
+    {
+      "id": "coke-wrong-week",
+      "document": "report_13bd61e477cb0e43850e",
+      "quote": "焦炭提涨继续挤压钢厂利润，铁水增量不及预期",
+      "label": 0,
+      "reason": "这是 2026-06-12 当周的说法。不能只因为另一周也有焦炭上涨，就把这句接到那一周的事件实例上。",
+      "hypothesis_id": "h-coke-week",
+      "target": "w0612:margin",
+      "documents": [
+        {"id": "w0605", "report_date": "2026-06-05"},
+        {"id": "w0612", "report_date": "2026-06-12"}
+      ],
+      "events": [
+        {"id": "w0605:coke", "doc_id": "w0605", "commodity": "焦炭", "indicator": "价格", "direction": "上升", "evidence": "焦炭价格上涨"},
+        {"id": "w0612:margin", "doc_id": "w0612", "commodity": "钢厂", "indicator": "钢厂利润", "direction": "下降", "evidence": "焦炭提涨继续挤压钢厂利润，铁水增量不及预期"}
+      ],
+      "edges": [
+        {"head": "w0605:coke", "tail": "w0612:margin", "relation": "导致", "evidence_ids": ["ev:w0612:margin"], "why": "指标方向看起来一致"}
+      ]
+    },
+    {
+      "id": "hedged-rebound",
+      "document": "report_13bd61e477cb0e43850e",
+      "quote": "周中出现长协谈判传闻扰动，带动矿价小幅反弹，但消息未证实",
+      "label": 0,
+      "reason": "同一周的传闻，而且原文写了消息未证实。不能把它当成对另一期矿价的跨文档因果。",
+      "hypothesis_id": "h-hedge",
+      "target": "w0612:price",
+      "documents": [
+        {"id": "w0522", "report_date": "2026-05-22"},
+        {"id": "w0612", "report_date": "2026-06-12"}
+      ],
+      "events": [
+        {"id": "w0522:price", "doc_id": "w0522", "commodity": "铁矿石", "indicator": "价格", "direction": "上升", "evidence": "矿价上涨"},
+        {"id": "w0612:price", "doc_id": "w0612", "commodity": "铁矿石", "indicator": "价格", "direction": "上升", "evidence": "周中出现长协谈判传闻扰动，带动矿价小幅反弹，但消息未证实"}
+      ],
+      "edges": [
+        {"head": "w0522:price", "tail": "w0612:price", "relation": "导致", "evidence_ids": ["ev:w0612:price"], "why": "两期矿价都在涨"}
+      ]
+    },
+    {
+      "id": "denied-transmission",
+      "document": "report_04792c03a8dcfd501fa9",
+      "quote": "原油价格的上涨已难以通过成本推升传导至铁矿",
+      "label": 0,
+      "reason": "原文否定了这条传导，不能因为出现了推升就记成因果。",
+      "hypothesis_id": "h-deny",
+      "target": "w0605:ore",
+      "documents": [
+        {"id": "w0605", "report_date": "2026-06-05"}
+      ],
+      "events": [
+        {"id": "w0605:oil", "doc_id": "w0605", "commodity": "原油", "indicator": "价格", "direction": "上升", "evidence": "原油价格上涨"},
+        {"id": "w0605:ore", "doc_id": "w0605", "commodity": "铁矿石", "indicator": "价格", "direction": "上升", "evidence": "原油价格的上涨已难以通过成本推升传导至铁矿"}
+      ],
+      "edges": [
+        {"head": "w0605:oil", "tail": "w0605:ore", "relation": "导致", "evidence_ids": ["ev:w0605:ore"], "why": "句子里有推升"}
+      ]
+    },
+    {
+      "id": "same-paragraph-cost",
+      "document": "report_250a9ad800956f8cc7d6",
+      "quote": "原油价格回调带动成本预期松动",
+      "label": 0,
+      "reason": "这是同一段里的说法，没有日期把成本预期对准另一周的具体成本事件。",
+      "hypothesis_id": "h-cost-week",
+      "target": "w0424:cost",
+      "documents": [
+        {"id": "w0424", "report_date": "2026-04-24"},
+        {"id": "w0522", "report_date": "2026-05-22"}
+      ],
+      "events": [
+        {"id": "w0522:oil", "doc_id": "w0522", "commodity": "原油", "indicator": "价格", "direction": "下降", "evidence": "原油价格回调带动成本预期松动"},
+        {"id": "w0424:cost", "doc_id": "w0424", "commodity": "钢厂", "indicator": "成本", "direction": "下降", "evidence": "钢厂成本下降"}
+      ],
+      "edges": [
+        {"head": "w0522:oil", "tail": "w0424:cost", "relation": "导致", "evidence_ids": ["ev:w0522:oil"], "why": "句子提到成本，就接到更早一周的成本"}
+      ]
+    }
+  ]
+}

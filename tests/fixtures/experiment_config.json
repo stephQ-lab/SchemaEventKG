@@ -1,0 +1,14 @@
+{
+  "relation_method": "abductive",
+  "stage2": "eventkg.graph_induction.induce",
+  "pipeline_flags": {"multi_source": true, "joint": true, "mode": "D"},
+  "gold": "tests/fixtures/cross_gold.json",
+  "gold_cross_positives": 5,
+  "ablation_extra_positive": "r1:ship → r3:freight，由 eventkg.evaluate_cross.ablation_gold 在运行时追加，不在 Gold 文件里",
+  "human_review": "tests/fixtures/human_implicit_review.json",
+  "script": "python -m eventkg.evaluate_cross",
+  "regenerated_report": "example/experiment/joint_ablation_report.json",
+  "score_kind": "model_score",
+  "score_note": "模型评分没有校准，不是概率。规则通过也不会写成 1.0。",
+  "model_accuracy": null
+}

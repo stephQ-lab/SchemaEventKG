@@ -1,0 +1,185 @@
+一条流水线：开放三元组 + 跨文档事理图谱（eventkg）
+==================================================
+
+一次运行写出一张图：example/generated/unified10_category/neo4j/unified10_full.cypher。
+前半是开放三元组：实体、品类、品种、句内关系、概念。
+后半是事件层 eventkg/。
+
+节点名称
+--------
+对比数字不进节点。价格、库存、产量写成趋势：上涨、下跌、上升、下降、累库、去库。
+节点保留时间（本期、下期、5月21日）和用来区分对象的口径（47港、247家、62%）。
+同一概念的不同说法、不同断句、从长句截出的短词，在同一篇里合成一个节点。
+45港和47港、本期和下期、上升和下降不合。
+
+这一版请用新的 --output 目录，不要把旧的 llm_cache.jsonl 拿来续跑。
+品类只来自文章标题（这十篇是铁矿石、PVC）。正文品种写成实体；
+PB粉、铁水、电石法PVC 用「属于」连到标题品类。螺纹钢、钢材不再单独成为品类。
+
+和上一版相比改了什么
+--------------------
+1. 速度
+   - Qwen3 默认开 thinking，两半都在为看不见的思考付 token。现在两半都显式关掉
+     （chat_template_kwargs.enable_thinking=false），temperature=0。要开回来：export QWEN_THINKING=1。
+   - 三元组切片不再按「每页 × 每章节」切：叙述文字跨页、跨章节合并到 3000 字以内，表格仍单独成片。
+     10 篇从 1177 片降到 191 片（三元组调用约 3531 → 约 573 次）。
+   - 事件层不再做 O(n²) 的两两语义召回。调用次数固定：26 个窗口抽取 + 10 次整篇综合
+     + 几次指标归一 + 不超过 50 批跨期核验，合计约 100 次。并发 8。
+   - 所有模型回答缓存在 event_layer/llm_cache.jsonl，中断后同一条命令重跑会直接读缓存。
+
+2. 链路深度
+   - 窗口抽取：每篇切成 1–3 个约 2200 字的窗口（多个章节一起看），不再逐句孤立抽取。
+   - 整篇综合：每篇再看一次清洗后的全文 + 事件目录，补跨段落/跨章节关系（原文明示 或 综合推断，
+     推断必须给理由和依据原文），标出同一事实的重复事件，整理 2–5 条文档主线。
+   - 跨文档：每个事件绑定一个「状态变量」= 品种|指标|口径|周期（如 铁矿石|港口库存|47港|当期）。
+     · 事态延续：同一变量在相邻两期报告之间相连，标 延续/反转/恢复/中断。
+     · 预期验证：上一期「预测中」的事件连到下一期同变量的实测，标 兑现/落空/部分兑现。
+     · 跨期传导：某篇明确写过的因果规律（抽象到 变量+方向）在相邻两期之间实例化，再由模型逐对核验。
+     这些边把 A→B（第 1 篇）与 B'→C→D（第 2 篇）接成一条长链。
+   - 抽象层：抽象事件 = 变量 + 方向（如「铁矿石·47港·港口库存 下降」），文档内的因果关系
+     提升为抽象关系并计支持数，形成可复用的传导规律。
+
+3. 抽取杂乱
+   - 正文清洗：去掉免责声明、目录、图表标题、数据来源、公式、表头碎片、全文重复行。
+   - 粒度规则：同一指标的绝对值/环比/同比合成一个事件；分项用「构成」挂到总量；并列结果不串成直线。
+   - 校验：事件原文必须能在原文里找到（轻微改写会自动对回原句），事件名里的数字必须出现在原文里；
+     因果关系必须有触发词且两端都能在依据句里定位；方向、维度、状态都是封闭词表。
+   - 合并：只在同一篇内合并（同变量同方向同状态，或模型标出的重复且指标/数字一致），跨篇绝不按名称合并。
+   - 区分：焦炭的下游需求和铁矿石的下游需求是两个变量（品种是变量键的一部分）；
+     45港≠47港、澳洲≠全球、当期≠月度 也由变量键区分，指标归一时有硬性校验防止误并。
+
+4. Neo4j 写入
+   - 品类节点只写标题层级。事件和指标用「涉及品类」连到这篇的标题品类，
+     品种本身是实体。词表里有上级的品种才写「属于」。
+   - 节点改为按 uid MERGE 再 SET 属性（原来按全部属性 MERGE，属性一变就重复建点）。
+   - 边的 MATCH 带标签，并在文件开头 CREATE INDEX；节点和边都用 UNWIND 批量写入。
+   - 本地 Neo4j 5.26 上验证过：同一文件导入两次，节点数和边数不变。
+
+十篇文档
+--------
+PVC 日报：隆众资讯PVC日报0511、隆众资讯PVC日报1012。
+铁矿石周刊：20260417、20260424、20260515、20260522、20260529、20260605、20260612、20260626。
+20260529 的文件名在日期和 .pdf 之间有一个空格，保持原名。
+PVC 文件名没有四位年份，不猜年份，不参与按日期的事态延续/预期验证；它们仍通过共享的指标与抽象事件和其他报告相连。
+
+不要做的事
+----------
+不要和正在跑的十五篇或十篇任务同时打 http://172.20.20.24:8003。
+不要再启动第二个 27B，不要杀别人的 vLLM。
+不要把 QWEN_API_KEY 或 Neo4j 密码写进仓库。
+解压到新目录，不要覆盖正在跑的旧目录。
+不要运行 event_chains.py。
+
+准备
+----
+PY=/apply/home/wangyixian/Users/JieyaoQin/py311/bin/python
+cd /path/to/AutoSchemaKG_eventkg
+
+"$PY" -m pip install -r requirements.txt
+三元组阶段依赖这个环境里已经装好的 AutoSchema 包；requirements.txt 只补 openai、json_repair、filelock。
+（只有用 Python 直接导入 Neo4j 时才需要再装 neo4j；用 cypher-shell 导入不需要。）
+
+export QWEN_BASE_URL=http://172.20.20.24:8003/v1
+export QWEN_MODEL=qwen3.8-27b
+read -s QWEN_API_KEY
+export QWEN_API_KEY
+如果接口不校验密钥，填任意非空字符串。
+
+"$PY" -u run_unified.py --preflight
+预检会打印 chunks（应约 191）、event_windows（应为 26）和 thinking（应为 false）。
+
+跨文档关系有两种做法
+----------------------
+默认 legacy：用历史规律召回跨期候选，再让模型逐对判断。
+abductive：先按实体、商品、区域、事件类型、时间、状态变量、产业链、语义相似度、局部关系和历史机制召回候选（历史机制只用于召回）。模型给出单一直接原因、多个共同原因、间接影响、共同原因解释、时间或主题关联、证据不足六类解释。引用先对齐到具体事件实例：只凭指标和方向一致不能连边。证据按原因实例、结果实例、关系支持、时间对齐和反证分开。没有对齐到同一次事件时保留为 POSSIBLE_CAUSE。因果触发词还必须落在这两个提及之间的同一个关系分句里，不能借用同一段里另一对事件的触发词。前期、上期、上周不会绑到本期事件。已发生原因指向预测中的结果时不记为已发生因果。选图之后不按方向先验改写关系，只标记 POLARITY_CONFLICT。对外分数是未校准的模型评分，不是概率，规则通过也不会写成 1.0。
+事态延续、预期验证、后续观测和可能原因都不是因果问答的边。legacy 仍可按旧口径把事态延续拼进链里，便于对照。
+真实 Qwen 对照以 QWEN_RUN.md 为准：先 mkdir，再把日志重定向到已经存在的目录。先 --snapshot-only 写一份事件快照，不要在抽事件时跑 Legacy 跨期核验。Legacy 和 Abductive 分两次读同一份 event_snapshot.json，不要同时打到同一个模型。
+abductive 写 graph_abductive.json、report_abductive.md、event_layer_abductive.cypher 和 abduction.json，不覆盖已有的 graph.json。
+服务器上的 abductive 先把各目标的全部解释收成一张候选图，再逐边裁决哪些成立、哪些不确定、哪些拒绝。这不是全局 MAP。同一个多原因假设里的多个原因可以并存；互相独立的单原因假设不会自动并成多个原因。同一段原文只计一次。时间顺序、产业链和历史机制不能单独确认因果。
+候选图、证据来源、评分、替代解释和拒绝理由在 event_layer/abduction.json 的 global 与 candidate_graph。
+这次只改关系推断，窗口抽取和三元组抽取的提示词没变。当前这版抽取提示词对应的 llm_cache.jsonl 可以复制；溯因调用是新的，缓存里没有。
+离线对照和四种消融（A 独立选图，B 加多来源证据，C 加全局选择，D 两者都加）都是脚本功能测试，不是模型准确率，也不写原始 graph.json。构造切片的分数不能当成方法结论。Gold 文件里的跨文档正例是 5 条，消融报告的第 6 条是运行时追加的构造样本。
+"$PY" -m eventkg.evaluate_cross
+报告写到 example/experiment/joint_ablation_report.json，可从项目里的代码和 tests/fixtures 重新生成。
+
+运行
+----
+建议先只抽事件并写快照（不跑跨期核验）：
+mkdir -p example/generated/events_snapshot
+nohup "$PY" -u run_unified.py --snapshot-only --workers 1 --output example/generated/events_snapshot > example/generated/events_snapshot/run.log 2>&1 &
+tail -f example/generated/events_snapshot/run.log
+看 example/generated/events_snapshot/event_snapshot.json。对照实验按 QWEN_RUN.md 继续。
+品类节点应只有标题层级（铁矿石、PVC）。
+
+这一版改过抽取提示词，窗口抽取和三元组抽取都不会命中旧缓存。请换一个 --output 目录重跑，不要复制旧的 llm_cache.jsonl。
+
+完整运行（三元组 + 事件层 + 合并），并发 8：
+nohup "$PY" -u run_unified.py --output example/generated/unified10_category --workers 8 > unified10.log 2>&1 &
+echo $! > unified10.pid
+tail -f unified10.log
+
+阶段顺序：extraction、document_link、triples_csv、concepts、concept_csv、neo4j、event_layer、merge。
+中断后用同一条命令再跑。已完成的阶段记在 example/generated/unified10_category/run_state.json；
+事件层的模型回答缓存在 example/generated/unified10_category/event_layer/llm_cache.jsonl。
+如果改了代码，run_state.json 会因为代码指纹变化拒绝续跑，请换一个 --output 目录。
+
+事件层输出（event_layer/）
+--------------------------
+event_layer.cypher   事件层 Cypher（合并阶段会和三元组 Cypher 拼成 unified10_full.cypher）
+graph.json           事件、关系、变量、抽象层、链路的完整数据（检索用）
+report.md            规模统计、耗时、模型调用数、前 15 条跨文档推理链（逐步附日期和原文）、抽象传导链、预期验证样例
+report.json          同上，机器可读
+llm_cache.jsonl      模型回答缓存
+
+关系与推理链规则
+----------------
+文档内：导致、促进、抑制、必要条件、构成、之前、之后、同时（都要有原文依据句）。
+跨文档：事态延续（延续/反转/转变/中断/恢复）、预期验证（兑现/部分兑现/落空/待定）、跨期传导。
+因果问答只沿 ASSERTED_CAUSE 和 INFERRED_SUPPORTED，以及文档内的导致、促进、抑制、构成。后续观测、事态延续、预期验证和 POSSIBLE_CAUSE 不往下传。
+legacy 建链时仍可把「延续」和「兑现」拼进旧链路，便于和以前的结果对照；abductive 不拼接。反转、落空不往下传。
+抑制表示对冲因素：链可以停在它上面，但不从它继续往下走。
+综合预测类句子里与已知传导方向相反的因素（如铁水增加对累库）会改标为抑制，报告里显示「·校正」。
+
+多跳检索（命令行）
+------------------
+"$PY" -m eventkg.retrieve --graph example/generated/unified10_category/event_layer/graph.json \
+    --question "铁矿石港口库存为什么下降" --hops 4
+加 --answer 会让模型只依据检索到的链路和原文作答（会打一次接口）。
+
+导入 Neo4j（可选）
+------------------
+地址 bolt://192.168.169.201:7687，用户 neo4j。密码用库上现有口令。
+
+read -s NEO4J_PASSWORD
+export NEO4J_PASSWORD
+cypher-shell -a bolt://192.168.169.201:7687 -u neo4j -p "$NEO4J_PASSWORD" -f example/generated/unified10_category/neo4j/unified10_full.cypher
+
+常用查询
+--------
+// 最长的跨文档推理链（每步带报告日期）
+MATCH (c:跨文档推理链)-[k:包含]->(e:实例事件)
+WITH c, k, e ORDER BY k.序号
+RETURN c.路径, c.长度, collect(e.报告日期 + ' ' + e.名称) AS 步骤
+ORDER BY c.得分 DESC LIMIT 10;
+
+// 一个指标的逐期走势（事态延续）
+MATCH p = (a:实例事件)-[:事态延续*1..8]->(b:实例事件)
+WHERE a.变量键 = '铁矿石|港口库存|47港|当期' AND NOT ()-[:事态延续]->(a)
+RETURN p;
+
+// 上游原因多跳追溯（文档内因果 + 跨期传导 + 事态延续）
+MATCH p = (x:实例事件)-[:导致|促进|抑制|跨期传导|事态延续*1..6]->(y:实例事件)
+WHERE y.名称 CONTAINS '港口库存'
+RETURN p ORDER BY length(p) DESC LIMIT 10;
+
+// 预测是否兑现
+MATCH (f:实例事件)-[r:预期验证]->(a:实例事件)
+RETURN f.报告日期, f.名称, r.结果, a.报告日期, a.名称;
+
+// 抽象传导规律（支持数最高）
+MATCH (a:抽象事件)-[r:导致|促进|抑制]->(b:抽象事件)
+RETURN a.名称, type(r), b.名称, r.支持数, r.文档数 ORDER BY r.支持数 DESC LIMIT 30;
+
+// 同一事件在三元组一半和事件层的连接点：文档、品类、事件类型
+MATCH (e:实例事件)-[:来自]->(d:文档)<-[:收录于]-(p:原文)
+RETURN d.名称, count(DISTINCT e), count(DISTINCT p);

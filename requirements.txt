@@ -1,0 +1,4 @@
+openai>=1.0.0
+json_repair
+filelock
+jieba>=0.42.1
